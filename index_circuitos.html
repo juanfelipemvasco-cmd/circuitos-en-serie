@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circuito RLC en serie – Matemáticas 4</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg1:#1b0a3f; --bg2:#0e0624;
+    --panel:rgba(255,255,255,.045); --panel2:rgba(255,255,255,.07);
+    --line:rgba(255,255,255,.09);
+    --text:#f1ecff; --muted:#a99bd0;
+    --magenta:#d946ef; --pink:#ff4d8d; --orange:#ff9a3d; --purple:#8b5cf6; --teal:#35e0c0;
+    --grad:linear-gradient(135deg,#d946ef,#ff4d8d 55%,#ff9a3d);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;min-height:100vh;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       background:radial-gradient(1200px 700px at 80% -10%,#3a1170 0%,transparent 60%),linear-gradient(160deg,var(--bg1),var(--bg2));
+       background-attachment:fixed;line-height:1.45}
+
+  /* ===== Layout ===== */
+  .app{display:grid;grid-template-columns:76px 1fr;min-height:100vh}
+  aside{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0;
+        background:linear-gradient(180deg,#c026d3,#7c1fb8 45%,#3b0f7a);box-shadow:6px 0 30px rgba(217,70,239,.25)}
+  .avatar{width:44px;height:44px;border-radius:50%;background:#fff;color:#4a1a8a;display:grid;place-items:center;font-weight:800;margin-bottom:14px}
+  aside a{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;color:#fff;text-decoration:none;font-size:1.25rem;opacity:.8;transition:.2s}
+  aside a:hover{background:rgba(255,255,255,.2);opacity:1}
+  .wrap{padding:22px 26px 40px;max-width:1500px;width:100%;margin:auto}
+
+  /* ===== Top bar ===== */
+  .topbar{display:flex;gap:14px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+  .pill{flex:1;min-width:260px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f6e9d6;color:#2a1450;border-radius:999px;padding:8px 8px 8px 22px}
+  .pill .eqt{font-family:"Cambria Math","Times New Roman",serif;font-size:1.1rem;font-weight:600}
+  .pill button{border:0;border-radius:999px;padding:10px 22px;font-weight:700;color:#fff;background:var(--grad);cursor:pointer}
+  .week{color:var(--muted);font-size:.8rem;text-align:right}
+  .week b{display:block;color:var(--text);font-size:.95rem}
+
+  /* ===== Panels ===== */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;backdrop-filter:blur(6px)}
+  .panel h2{margin:0 0 14px;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text);font-weight:700}
+  .panel h2 span{color:var(--muted);font-weight:500;letter-spacing:.04em;text-transform:none;margin-left:6px}
+
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:18px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;text-align:center}
+  .kpi small{display:flex;justify-content:center;align-items:center;gap:7px;color:var(--muted);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .kpi strong{display:block;font-size:1.55rem;margin:6px 0 2px;font-weight:700}
+  .kpi em{font-style:normal;color:var(--muted);font-size:.72rem}
+  .kpi.tipo strong{font-size:1.05rem;line-height:1.25;min-height:2.6rem;display:grid;place-items:center;
+        background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* Main grid */
+  .grid{display:grid;grid-template-columns:310px 1fr 330px;gap:18px;margin-bottom:18px}
+  .stack{display:flex;flex-direction:column;gap:18px}
+  .chart-box{position:relative;height:340px}
+  .chart-box.sm{height:260px}
+
+  /* Form */
+  label{display:block;font-size:.72rem;color:var(--muted);margin:10px 0 4px;letter-spacing:.04em}
+  input,select{width:100%;padding:9px 11px;border-radius:10px;border:1px solid var(--line);background:rgba(10,3,30,.55);color:var(--text);font-size:.92rem}
+  input:focus,select:focus{outline:2px solid var(--magenta);border-color:transparent}
+  select option{background:#1b0a3f}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:.7rem;color:var(--muted);margin-top:4px}
+  .go{margin-top:16px;width:100%;border:0;border-radius:12px;padding:12px;font-weight:700;font-size:.95rem;color:#fff;background:var(--grad);cursor:pointer;box-shadow:0 8px 24px rgba(217,70,239,.35)}
+  .go:hover{filter:brightness(1.08)}
+  .error{display:none;background:rgba(255,77,141,.15);border:1px solid var(--pink);color:#ffc2d9;padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:.85rem}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:999px;padding:7px 13px;font-size:.78rem;cursor:pointer;transition:.2s}
+  .chip:hover{background:var(--grad);border-color:transparent}
+
+  /* Gauges */
+  .gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .gauge{text-align:center}
+  .gauge .cv{position:relative;height:130px}
+  .gauge small{display:block;margin-top:8px;color:var(--muted);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase}
+
+  /* Analysis tiles */
+  .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .tile{background:rgba(10,3,30,.45);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .tile.full{grid-column:1/-1}
+  .tile small{display:block;color:var(--muted);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+  .tile .v{font-family:"Cambria Math","Times New Roman",serif;font-size:1.08rem;word-break:break-word}
+
+  /* Tables */
+  .tw{overflow:auto;border-radius:14px;border:1px solid var(--line);max-height:420px}
+  table{width:100%;border-collapse:collapse;font-size:.88rem}
+  thead th{position:sticky;top:0;background:linear-gradient(90deg,#7c1fb8,#c026d3);color:#fff;text-align:right;font-weight:600;
+           padding:10px 14px;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase}
+  thead th:first-child,tbody td:first-child{text-align:left}
+  tbody td{padding:9px 14px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line)}
+  tbody tr:nth-child(even){background:rgba(255,255,255,.035)}
+  tbody tr:hover{background:rgba(217,70,239,.18)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+
+  details summary{cursor:pointer;font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:.78rem}
+  details p{color:#d9d0f2;font-size:.92rem;margin:10px 0}
+  .eq{font-family:"Cambria Math","Times New Roman",serif;font-size:1.2rem;text-align:center;padding:12px;background:rgba(10,3,30,.5);border-radius:12px;margin:10px 0}
+  .mono{font-family:"Cambria Math","Times New Roman",serif}
+
+  #resultados{display:none}
+
+  @media(max-width:1250px){.grid{grid-template-columns:300px 1fr}.grid .phase{grid-column:1/-1}.kpis{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:900px){
+    .app{grid-template-columns:1fr}
+    aside{display:none}
+    .wrap{padding:14px}
+    .grid,.two{grid-template-columns:1fr}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .gauges{grid-template-columns:repeat(2,1fr)}
+    .tiles{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside>
+    <div class="avatar">Σ</div>
+    <a href="#inicio" title="Inicio">🏠</a>
+    <a href="#graficas" title="Gráficas">📈</a>
+    <a href="#analisis" title="Análisis">🧮</a>
+    <a href="#tablas" title="Tablas">📋</a>
+    <a href="#teoria" title="Teoría">📘</a>
+  </aside>
+
+  <div class="wrap" id="inicio">
+
+    <div class="topbar">
+      <div class="pill">
+        <span class="eqt">L·q″ + R·q′ + (1/C)·q = E(t)</span>
+        <button id="calcTop">Calcular</button>
+      </div>
+      <div class="week">Circuito RLC en serie<b>Matemáticas 4</b></div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi tipo"><small><span class="dot" style="background:var(--magenta)"></span>Tipo</small><strong id="kTipo">—</strong><em>según R² − 4L/C</em></div>
+      <div class="kpi"><small><span class="dot" style="background:var(--orange)"></span>ω₀</small><strong id="kW">—</strong><em>rad/s</em></div>
+      <div class="kpi"><small><span class="dot" style="background:var(--pink)"></span>α = R/2L</small><strong id="kA">—</strong><em>s⁻¹</em></div>
+      <div class="kpi"><small><span class="dot" style="background:var(--purple)"></span>Máx |q|</small><strong id="kQ">—</strong><em>coulombs</em></div>
+      <div class="kpi"><small><span class="dot" style="background:var(--teal)"></span>Máx |i|</small><strong id="kI">—</strong><em>amperios</em></div>
+    </div>
+
+    <!-- Parámetros | Línea de tiempo | Plano de fase -->
+    <div class="grid" id="graficas">
+      <div class="stack">
+        <div class="panel">
+          <h2>Parámetros</h2>
+          <div class="hint" style="margin:-6px 0 8px">Puedes escribir expresiones: pi, e, 2*pi, sqrt(2), ln(2)/1600, 1e-3.</div>
+          <div id="error" class="error"></div>
+          <div class="row">
+            <div><label for="L">L · Inductancia (H)</label><input id="L" type="text" inputmode="decimal" autocomplete="off" value="1"></div>
+            <div><label for="R">R · Resistencia (Ω)</label><input id="R" type="text" inputmode="decimal" autocomplete="off" value="0.5"></div>
+          </div>
+          <label for="C">C · Capacitancia (F)</label>
+          <input id="C" type="text" inputmode="decimal" autocomplete="off" value="1">
+
+          <label for="Etipo">Voltaje aplicado E(t)</label>
+          <select id="Etipo">
+            <option value="cero">E(t) = 0 (circuito libre)</option>
+            <option value="const">E(t) = E₀ (constante)</option>
+            <option value="seno">E(t) = E₀·sin(ωt)</option>
+            <option value="custom">Función personalizada</option>
+          </select>
+          <div id="gE0" style="display:none"><label for="E0">E₀ · Amplitud (V)</label><input id="E0" type="text" inputmode="decimal" autocomplete="off" value="1"></div>
+          <div id="gW" style="display:none"><label for="W">ω · Frecuencia angular (rad/s)</label><input id="W" type="text" inputmode="decimal" autocomplete="off" value="1.5"></div>
+          <div id="gCustom" style="display:none">
+            <label for="Ecustom">E(t) =</label>
+            <input id="Ecustom" type="text" value="5*sin(2*t) + 2">
+            <div class="hint">Usa t, + − * / ^ ( ) y sin, cos, tan, exp, sqrt, abs, ln, pi. Multiplica con * (ej. 2*t).</div>
+          </div>
+
+          <div class="row">
+            <div><label for="q0">q(0) · Carga (C)</label><input id="q0" type="text" inputmode="decimal" autocomplete="off" value="1"></div>
+            <div><label for="i0">i(0) · Corriente (A)</label><input id="i0" type="text" inputmode="decimal" autocomplete="off" value="0"></div>
+          </div>
+          <label for="tf">Tiempo final (s)</label>
+          <input id="tf" type="text" inputmode="decimal" autocomplete="off" value="30">
+          <button class="go" id="calcBtn">Calcular y graficar</button>
+        </div>
+
+        <div class="panel">
+          <h2>Ejemplos</h2>
+          <div class="chips">
+            <button class="chip" data-ex="sobre">Sobreamortiguado</button>
+            <button class="chip" data-ex="critico">Crítico</button>
+            <button class="chip" data-ex="sub">Subamortiguado</button>
+            <button class="chip" data-ex="libre">Sin amortiguamiento</button>
+            <button class="chip" data-ex="const">Voltaje constante</button>
+            <button class="chip" data-ex="forzado">Voltaje sinusoidal</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Línea de tiempo <span>q(t) e i(t) · solución numérica RK4</span></h2>
+        <div class="chart-box" style="height:520px"><canvas id="cT"></canvas></div>
+      </div>
+
+      <div class="stack phase">
+        <div class="panel">
+          <h2>Plano de fase <span>q vs i</span></h2>
+          <div class="chart-box sm"><canvas id="cP"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Energía <span>½Li² + q²/2C</span></h2>
+          <div class="chart-box sm"><canvas id="cE"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="resultados">
+
+      <!-- Indicadores circulares -->
+      <div class="panel" style="margin-bottom:18px">
+        <h2>Indicadores</h2>
+        <div class="gauges">
+          <div class="gauge"><div class="cv"><canvas id="g1"></canvas></div><small>Amortiguamiento ζ</small></div>
+          <div class="gauge"><div class="cv"><canvas id="g2"></canvas></div><small>q final / q máx</small></div>
+          <div class="gauge"><div class="cv"><canvas id="g3"></canvas></div><small>i final / i máx</small></div>
+          <div class="gauge"><div class="cv"><canvas id="g4"></canvas></div><small>Energía final / máx</small></div>
+        </div>
+      </div>
+
+      <!-- Análisis -->
+      <div class="panel" id="analisis" style="margin-bottom:18px">
+        <h2>Análisis de la ecuación diferencial</h2>
+        <div class="tiles">
+          <div class="tile"><small>Ecuación característica</small><div class="v" id="carac"></div></div>
+          <div class="tile"><small>Discriminante R² − 4L/C</small><div class="v" id="disc"></div></div>
+          <div class="tile"><small>Raíces</small><div class="v" id="raices"></div></div>
+          <div class="tile"><small>Tipo de movimiento</small><div class="v" id="tipo"></div></div>
+          <div class="tile full"><small>Solución homogénea q<sub>h</sub>(t)</small><div class="v" id="solgen"></div></div>
+          <div class="tile full" id="tPart" style="display:none"><small>Solución particular q<sub>p</sub>(t)</small><div class="v" id="solpart"></div></div>
+        </div>
+      </div>
+
+      <!-- Tablas -->
+      <div class="two" id="tablas">
+        <div class="panel">
+          <h2>Resumen de valores</h2>
+          <div class="tw"><table>
+            <thead><tr><th>Magnitud</th><th>Valor</th><th>Unidad</th></tr></thead>
+            <tbody id="claves"></tbody>
+          </table></div>
+        </div>
+        <div class="panel">
+          <h2>Tabla de valores <span>11 puntos</span></h2>
+          <div class="tw"><table>
+            <thead><tr><th>t (s)</th><th>q(t) (C)</th><th>i(t) (A)</th><th>E(t) (V)</th></tr></thead>
+            <tbody id="tabla"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="teoria">
+      <details>
+        <summary>📘 Teoría · ¿de dónde sale la ecuación?</summary>
+        <p>Según la <b>segunda ley de Kirchhoff</b>, el voltaje aplicado E(t) a un circuito cerrado es igual a la suma de las caídas de voltaje.</p>
+        <p>Inductor: <span class="mono">L·di/dt = L·d²q/dt²</span> · Resistor: <span class="mono">iR = R·dq/dt</span> · Capacitor: <span class="mono">q/C</span></p>
+        <p>Como i = dq/dt, al sumar las tres caídas se obtiene:</p>
+        <div class="eq">L·d²q/dt² + R·dq/dt + (1/C)·q = E(t)</div>
+        <p><b>Ecuación característica:</b> <span class="mono">L·m² + R·m + 1/C = 0</span>. Según el discriminante <span class="mono">R² − 4L/C</span>:</p>
+        <p>• <b>&gt; 0</b>: raíces reales distintas → sobreamortiguado.<br>
+           • <b>= 0</b>: raíz real doble → críticamente amortiguado.<br>
+           • <b>&lt; 0</b>: raíces complejas → subamortiguado (oscila y decae).<br>
+           • <b>R = 0</b>: raíces imaginarias puras → oscilación sin amortiguamiento.</p>
+        <p>Numéricamente se reescribe como sistema de primer orden: <span class="mono">q′ = i</span>, <span class="mono">i′ = (E(t) − R·i − q/C)/L</span>, y se integra con Runge-Kutta de orden 4.</p>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ---------- Números y expresiones (pi, e, sqrt, ln...) ---------- */
+function evalExpr(src){
+  let s = String(src).toLowerCase().replace(/\s+/g, "").replace(/,/g, ".").replace(/π/g, "pi");
+  if (!s) return NaN;
+  if (/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/.test(s)) return parseFloat(s);
+  const toks = s.match(/\d+\.?\d*(?:e[+-]?\d+)?|\.\d+|[a-z]+|\*\*|[-+*/^()]/g);
+  if (!toks || toks.join("") !== s) return NaN;
+  const consts = { pi: Math.PI, e: Math.E };
+  const funcs = { sin: Math.sin, sen: Math.sin, cos: Math.cos, tan: Math.tan, exp: Math.exp,
+                  sqrt: Math.sqrt, abs: Math.abs, ln: Math.log, log: Math.log10 };
+  let out = "", prev = null;
+  for (const t of toks){
+    let kind;
+    if (/^[\d.]/.test(t)) kind = "num";
+    else if (Object.prototype.hasOwnProperty.call(consts, t)) kind = "const";
+    else if (Object.prototype.hasOwnProperty.call(funcs, t)) kind = "func";
+    else if (/^[a-z]+$/.test(t)) return NaN;
+    else if (t === "(") kind = "(";
+    else if (t === ")") kind = ")";
+    else kind = "op";
+    const startsValue = kind === "num" || kind === "const" || kind === "func" || kind === "(";
+    const endsValue = prev === "num" || prev === "const" || prev === ")";
+    if (startsValue && endsValue) out += "*";
+    if (kind === "const") out += "(" + consts[t] + ")";
+    else if (kind === "func") out += "F." + t;
+    else out += (t === "^" ? "**" : t);
+    prev = kind;
+  }
+  try {
+    const r = new Function("F", "return (" + out + ");")(funcs);
+    return (typeof r === "number" && isFinite(r)) ? r : NaN;
+  } catch(e){ return NaN; }
+}
+function num(id){ return evalExpr($(id).value); }
+
+
+/* ---------- Formato ---------- */
+function fmt(x, d = 5){
+  if (!isFinite(x)) return "—";
+  if (x === 0) return "0";
+  const a = Math.abs(x);
+  if (a < 1e-4 || a >= 1e6) return x.toExponential(3);
+  return String(Number(x.toPrecision(d)));
+}
+function signed(x){ return (x < 0 ? "− " : "+ ") + fmt(Math.abs(x)); }
+
+/* ---------- E(t) personalizada ---------- */
+function compileCustom(expr){
+  let s = expr.toLowerCase().replace(/\s+/g, "");
+  if (!s) throw new Error("Escribe una función E(t).");
+  if (!/^[0-9a-z+\-*/^().,]*$/.test(s)) throw new Error("La función contiene caracteres no permitidos.");
+  s = s.replace(/\^/g, "**");
+  const map = {sin:"Math.sin", sen:"Math.sin", cos:"Math.cos", tan:"Math.tan", exp:"Math.exp",
+               sqrt:"Math.sqrt", abs:"Math.abs", ln:"Math.log", log:"Math.log10", pi:"Math.PI", t:"t"};
+  s = s.replace(/[a-z]+/g, w => {
+    if (!(w in map)) throw new Error("Palabra no reconocida en E(t): “" + w + "”.");
+    return map[w];
+  });
+  let f;
+  try { f = new Function("t", "return (" + s + ");"); }
+  catch(e){ throw new Error("La función E(t) no es válida. Revisa paréntesis y operadores."); }
+  const test = f(0.37);
+  if (typeof test !== "number" || !isFinite(test)) throw new Error("E(t) no produce un número válido.");
+  return f;
+}
+
+/* ---------- Lectura / validación ---------- */
+function leer(){
+  const v = id => num(id);
+  const p = {L:v("L"), R:v("R"), C:v("C"), q0:v("q0"), i0:v("i0"), tf:v("tf"),
+             tipo:$("Etipo").value, E0:v("E0"), W:v("W")};
+  for (const k of ["L","R","C","q0","i0","tf"])
+    if (!isFinite(p[k])) throw new Error("Completa todos los campos con números válidos.");
+  if (p.L <= 0) throw new Error("L debe ser mayor que 0.");
+  if (p.C <= 0) throw new Error("C debe ser mayor que 0.");
+  if (p.R < 0) throw new Error("R no puede ser negativa.");
+  if (p.tf <= 0) throw new Error("El tiempo final debe ser mayor que 0.");
+  if ((p.tipo === "const" || p.tipo === "seno") && !isFinite(p.E0)) throw new Error("Ingresa un valor válido para E₀.");
+  if (p.tipo === "seno" && !isFinite(p.W)) throw new Error("Ingresa un valor válido para ω.");
+  if (p.tipo === "cero") p.E = t => 0;
+  else if (p.tipo === "const") p.E = t => p.E0;
+  else if (p.tipo === "seno") p.E = t => p.E0 * Math.sin(p.W * t);
+  else p.E = compileCustom($("Ecustom").value);
+  return p;
+}
+
+/* ---------- Runge-Kutta 4 ---------- */
+function rk4(p, N = 6000){
+  const {L,R,C,E,q0,i0,tf} = p;
+  const h = tf / N;
+  const f = (t,q,i) => [i, (E(t) - R*i - q/C) / L];
+  let t = 0, q = q0, i = i0;
+  const T=[t], Q=[q], I=[i];
+  for (let n = 0; n < N; n++){
+    const [k1q,k1i] = f(t, q, i);
+    const [k2q,k2i] = f(t+h/2, q+h/2*k1q, i+h/2*k1i);
+    const [k3q,k3i] = f(t+h/2, q+h/2*k2q, i+h/2*k2i);
+    const [k4q,k4i] = f(t+h, q+h*k3q, i+h*k3i);
+    q += h/6*(k1q + 2*k2q + 2*k3q + k4q);
+    i += h/6*(k1i + 2*k2i + 2*k3i + k4i);
+    t += h;
+    if (!isFinite(q) || !isFinite(i)) throw new Error("La solución numérica diverge. Prueba otros valores o un tiempo menor.");
+    T.push(t); Q.push(q); I.push(i);
+  }
+  return {T,Q,I};
+}
+
+/* ---------- Análisis analítico ---------- */
+function analisis(p){
+  const {L,R,C} = p;
+  const disc = R*R - 4*L/C;
+  const tol = 1e-9 * Math.max(R*R, 4*L/C);
+  const w0 = 1/Math.sqrt(L*C);
+  const alpha = R/(2*L);
+  const zeta = (R/2)*Math.sqrt(C/L);
+  const out = {disc, w0, alpha, zeta};
+  out.carac = `${fmt(L)}·m² ${signed(R)}·m ${signed(1/C)} = 0`;
+
+  if (R === 0){
+    out.tipo = "Sin amortiguamiento";
+    out.raices = `m = ± ${fmt(w0)}·i`;
+    out.hom = `q_h(t) = c₁·cos(${fmt(w0)}t) + c₂·sin(${fmt(w0)}t)`;
+  } else if (Math.abs(disc) <= tol){
+    const m = -R/(2*L);
+    out.tipo = "Críticamente amortiguado";
+    out.raices = `m₁ = m₂ = ${fmt(m)}`;
+    out.hom = `q_h(t) = (c₁ + c₂·t)·e^(${fmt(m)}t)`;
+  } else if (disc > 0){
+    const s = Math.sqrt(disc);
+    const m1 = (-R + s)/(2*L), m2 = (-R - s)/(2*L);
+    out.tipo = "Sobreamortiguado";
+    out.raices = `m₁ = ${fmt(m1)} ,  m₂ = ${fmt(m2)}`;
+    out.hom = `q_h(t) = c₁·e^(${fmt(m1)}t) + c₂·e^(${fmt(m2)}t)`;
+  } else {
+    const beta = Math.sqrt(-disc)/(2*L);
+    out.tipo = "Subamortiguado";
+    out.raices = `m = ${fmt(-alpha)} ± ${fmt(beta)}·i`;
+    out.hom = `q_h(t) = e^(${fmt(-alpha)}t)·[c₁·cos(${fmt(beta)}t) + c₂·sin(${fmt(beta)}t)]`;
+    out.beta = beta;
+  }
+
+  if (p.tipo === "const"){
+    out.part = `q_p = C·E₀ = ${fmt(C*p.E0)}`;
+  } else if (p.tipo === "seno"){
+    const K = 1/C - L*p.W*p.W;
+    const det = K*K + R*R*p.W*p.W;
+    if (det < 1e-12) out.part = "Resonancia (R = 0 y ω = ω₀): la amplitud crece sin límite; q_p lleva un factor t.";
+    else {
+      const A = K*p.E0/det, B = -R*p.W*p.E0/det;
+      out.part = `q_p(t) = ${fmt(A)}·sin(${fmt(p.W)}t) ${signed(B)}·cos(${fmt(p.W)}t)`;
+    }
+  }
+  return out;
+}
+
+/* ---------- Gráficas ---------- */
+Chart.defaults.color = "#a99bd0";
+Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+const charts = {};
+const GRID = "rgba(255,255,255,.07)";
+
+function reducir(xs, ys, max = 900){
+  const step = Math.max(1, Math.floor(xs.length / max));
+  const d = [];
+  for (let k = 0; k < xs.length; k += step) d.push({x: xs[k], y: ys[k]});
+  if ((xs.length - 1) % step !== 0) d.push({x: xs[xs.length-1], y: ys[ys.length-1]});
+  return d;
+}
+function gradient(c1, c2){
+  return ctx => {
+    const a = ctx.chart.chartArea;
+    if (!a) return c1;
+    const g = ctx.chart.ctx.createLinearGradient(0, a.top, 0, a.bottom);
+    g.addColorStop(0, c1); g.addColorStop(1, c2);
+    return g;
+  };
+}
+function lineStyle(color, fillTop, fillBot, fill = true){
+  return { borderColor: color, borderWidth: 2.2, pointRadius: 0, tension: .25, fill,
+           backgroundColor: gradient(fillTop, fillBot) };
+}
+function baseOpts(xl, yl){
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "nearest", intersect: false },
+    plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } },
+               tooltip: { backgroundColor: "#1b0a3f", borderColor: "#d946ef", borderWidth: 1 } },
+    scales: {
+      x: { type: "linear", title: { display: !!xl, text: xl }, grid: { color: GRID } },
+      y: { title: { display: !!yl, text: yl }, grid: { color: GRID } }
+    }
+  };
+}
+function mk(id, cfg){ if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); }
+
+function gauge(id, pct, texto, c1, c2){
+  const v = Math.max(0, Math.min(100, pct));
+  mk(id, {
+    type: "doughnut",
+    data: { datasets: [{ data: [v, 100 - v], borderWidth: 0,
+      backgroundColor: ctx => {
+        const a = ctx.chart.chartArea; if (!a) return c1;
+        if (ctx.dataIndex === 1) return "rgba(255,255,255,.08)";
+        const g = ctx.chart.ctx.createLinearGradient(a.left, a.top, a.right, a.bottom);
+        g.addColorStop(0, c1); g.addColorStop(1, c2); return g;
+      } }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: "76%", animation: false,
+               plugins: { legend: { display: false }, tooltip: { enabled: false } } },
+    plugins: [{ id: "ct", afterDraw(ch){
+      const {ctx, chartArea:a} = ch; ctx.save();
+      ctx.fillStyle = "#f1ecff"; ctx.font = "700 20px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(texto, (a.left + a.right)/2, (a.top + a.bottom)/2); ctx.restore();
+    } }]
+  });
+}
+
+let ultimo = null;
+function dibujar(){
+  if (!ultimo) return;
+  const {sol, an, p, En} = ultimo;
+
+  // Línea de tiempo: q (naranja) e i (magenta) con doble eje
+  const o = baseOpts("t (s)", "");
+  o.scales.y = { position: "left", title: { display: true, text: "q (C)", color: "#ff9a3d" }, grid: { color: GRID } };
+  o.scales.y1 = { position: "right", title: { display: true, text: "i (A)", color: "#d946ef" }, grid: { drawOnChartArea: false } };
+  mk("cT", { type: "line", options: o, data: { datasets: [
+    { label: "q(t)", data: reducir(sol.T, sol.Q), yAxisID: "y",  ...lineStyle("#ff9a3d", "rgba(255,154,61,.55)", "rgba(255,154,61,.02)") },
+    { label: "i(t)", data: reducir(sol.T, sol.I), yAxisID: "y1", ...lineStyle("#d946ef", "rgba(217,70,239,.5)", "rgba(217,70,239,.02)") }
+  ] } });
+
+  // Plano de fase
+  mk("cP", { type: "line", options: baseOpts("q (C)", "i (A)"), data: { datasets: [
+    { label: "Trayectoria", data: reducir(sol.Q, sol.I), ...lineStyle("#35e0c0", "rgba(53,224,192,.2)", "rgba(53,224,192,0)", false) }
+  ] } });
+
+  // Energía
+  mk("cE", { type: "line", options: baseOpts("t (s)", "E (J)"), data: { datasets: [
+    { label: "Energía", data: reducir(sol.T, En), ...lineStyle("#ff4d8d", "rgba(255,77,141,.5)", "rgba(255,77,141,.02)") }
+  ] } });
+
+  // Indicadores
+  const n = sol.T.length - 1;
+  const maxQ = Math.max(...sol.Q.map(Math.abs)) || 1, maxI = Math.max(...sol.I.map(Math.abs)) || 1, maxE = Math.max(...En) || 1;
+  gauge("g1", Math.min(an.zeta, 1) * 100, "ζ=" + fmt(an.zeta, 3), "#d946ef", "#8b5cf6");
+  gauge("g2", Math.abs(sol.Q[n]) / maxQ * 100, fmt(Math.abs(sol.Q[n]) / maxQ * 100, 3) + "%", "#ff4d8d", "#ff9a3d");
+  gauge("g3", Math.abs(sol.I[n]) / maxI * 100, fmt(Math.abs(sol.I[n]) / maxI * 100, 3) + "%", "#8b5cf6", "#d946ef");
+  gauge("g4", En[n] / maxE * 100, fmt(En[n] / maxE * 100, 3) + "%", "#ff9a3d", "#ff4d8d");
+}
+
+/* ---------- Calcular ---------- */
+function calcular(){
+  const err = $("error");
+  err.style.display = "none";
+  try{
+    const p = leer();
+    const an = analisis(p);
+    const sol = rk4(p);
+    const En = sol.T.map((_, k) => 0.5 * p.L * sol.I[k]**2 + sol.Q[k]**2 / (2 * p.C));
+    ultimo = {p, an, sol, En};
+
+    $("resultados").style.display = "block";
+
+    // KPIs
+    const maxQ = Math.max(...sol.Q.map(Math.abs)), maxI = Math.max(...sol.I.map(Math.abs));
+    $("kTipo").textContent = an.tipo;
+    $("kW").textContent = fmt(an.w0, 4);
+    $("kA").textContent = fmt(an.alpha, 4);
+    $("kQ").textContent = fmt(maxQ, 4);
+    $("kI").textContent = fmt(maxI, 4);
+
+    // Análisis
+    $("tipo").textContent = an.tipo;
+    $("carac").textContent = an.carac;
+    $("disc").textContent = fmt(an.disc);
+    $("raices").textContent = an.raices;
+    $("solgen").textContent = an.hom;
+    if (an.part){ $("tPart").style.display = ""; $("solpart").textContent = an.part; }
+    else $("tPart").style.display = "none";
+
+    // Resumen
+    const n = sol.T.length - 1;
+    const filas = [
+      ["Frecuencia natural ω₀", fmt(an.w0), "rad/s"],
+      ["Factor de amortiguamiento α", fmt(an.alpha), "s⁻¹"],
+      ["Razón de amortiguamiento ζ", fmt(an.zeta), "—"],
+      ["Máx |q(t)|", fmt(maxQ), "C"],
+      ["Máx |i(t)|", fmt(maxI), "A"],
+      [`q(${fmt(p.tf)})`, fmt(sol.Q[n]), "C"],
+      [`i(${fmt(p.tf)})`, fmt(sol.I[n]), "A"],
+    ];
+    if (an.beta) filas.splice(2, 0, ["Frecuencia amortiguada β", fmt(an.beta), "rad/s"]);
+    $("claves").innerHTML = filas.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+
+    // Tabla de valores
+    let html = "";
+    for (let k = 0; k <= 10; k++){
+      const idx = Math.round(k * n / 10);
+      html += `<tr><td>${fmt(sol.T[idx])}</td><td>${fmt(sol.Q[idx])}</td><td>${fmt(sol.I[idx])}</td><td>${fmt(p.E(sol.T[idx]))}</td></tr>`;
+    }
+    $("tabla").innerHTML = html;
+
+    dibujar();
+  } catch(e){
+    err.textContent = "⚠ " + e.message;
+    err.style.display = "block";
+  }
+}
+
+/* ---------- UI ---------- */
+function actualizarCampos(){
+  const t = $("Etipo").value;
+  $("gE0").style.display = (t === "const" || t === "seno") ? "" : "none";
+  $("gW").style.display = t === "seno" ? "" : "none";
+  $("gCustom").style.display = t === "custom" ? "" : "none";
+}
+$("Etipo").addEventListener("change", actualizarCampos);
+$("calcBtn").addEventListener("click", calcular);
+$("calcTop").addEventListener("click", calcular);
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") calcular(); });
+
+const ejemplos = {
+  sobre:   {L:1, R:5,   C:0.25, q0:1, i0:0, tf:10, tipo:"cero"},
+  critico: {L:1, R:2,   C:1,    q0:1, i0:0, tf:12, tipo:"cero"},
+  sub:     {L:1, R:0.5, C:1,    q0:1, i0:0, tf:30, tipo:"cero"},
+  libre:   {L:1, R:0,   C:1,    q0:1, i0:0, tf:25, tipo:"cero"},
+  const:   {L:1, R:2,   C:0.5,  q0:0, i0:0, tf:15, tipo:"const", E0:10},
+  forzado: {L:1, R:0.5, C:1,    q0:0, i0:0, tf:60, tipo:"seno", E0:1, W:1.5},
+};
+document.querySelectorAll("[data-ex]").forEach(b => b.addEventListener("click", () => {
+  const e = ejemplos[b.dataset.ex];
+  for (const k of ["L","R","C","q0","i0","tf"]) $(k).value = e[k];
+  $("Etipo").value = e.tipo;
+  if (e.E0 !== undefined) $("E0").value = e.E0;
+  if (e.W !== undefined) $("W").value = e.W;
+  actualizarCampos();
+  calcular();
+}));
+
+actualizarCampos();
+calcular();
+</script>
+</body>
+</html>
