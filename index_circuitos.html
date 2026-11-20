@@ -154,11 +154,11 @@
           <div class="hint" style="margin:-6px 0 8px">Puedes escribir expresiones: pi, e, 2*pi, sqrt(2), ln(2)/1600, 1e-3.</div>
           <div id="error" class="error"></div>
           <div class="row">
-            <div><label for="L">L · Inductancia (H)</label><input id="L" type="text" inputmode="decimal" autocomplete="off" value="1"></div>
-            <div><label for="R">R · Resistencia (Ω)</label><input id="R" type="text" inputmode="decimal" autocomplete="off" value="0.5"></div>
+            <div><label for="L">L · Inductancia (H)</label><input id="L" type="text" inputmode="text" autocomplete="off" value="1"></div>
+            <div><label for="R">R · Resistencia (Ω)</label><input id="R" type="text" inputmode="text" autocomplete="off" value="0.5"></div>
           </div>
           <label for="C">C · Capacitancia (F)</label>
-          <input id="C" type="text" inputmode="decimal" autocomplete="off" value="1">
+          <input id="C" type="text" inputmode="text" autocomplete="off" value="1">
 
           <label for="Etipo">Voltaje aplicado E(t)</label>
           <select id="Etipo">
@@ -167,8 +167,8 @@
             <option value="seno">E(t) = E₀·sin(ωt)</option>
             <option value="custom">Función personalizada</option>
           </select>
-          <div id="gE0" style="display:none"><label for="E0">E₀ · Amplitud (V)</label><input id="E0" type="text" inputmode="decimal" autocomplete="off" value="1"></div>
-          <div id="gW" style="display:none"><label for="W">ω · Frecuencia angular (rad/s)</label><input id="W" type="text" inputmode="decimal" autocomplete="off" value="1.5"></div>
+          <div id="gE0" style="display:none"><label for="E0">E₀ · Amplitud (V)</label><input id="E0" type="text" inputmode="text" autocomplete="off" value="1"></div>
+          <div id="gW" style="display:none"><label for="W">ω · Frecuencia angular (rad/s)</label><input id="W" type="text" inputmode="text" autocomplete="off" value="1.5"></div>
           <div id="gCustom" style="display:none">
             <label for="Ecustom">E(t) =</label>
             <input id="Ecustom" type="text" value="5*sin(2*t) + 2">
@@ -176,11 +176,11 @@
           </div>
 
           <div class="row">
-            <div><label for="q0">q(0) · Carga (C)</label><input id="q0" type="text" inputmode="decimal" autocomplete="off" value="1"></div>
-            <div><label for="i0">i(0) · Corriente (A)</label><input id="i0" type="text" inputmode="decimal" autocomplete="off" value="0"></div>
+            <div><label for="q0">q(0) · Carga (C)</label><input id="q0" type="text" inputmode="text" autocomplete="off" value="1"></div>
+            <div><label for="i0">i(0) · Corriente (A)</label><input id="i0" type="text" inputmode="text" autocomplete="off" value="0"></div>
           </div>
           <label for="tf">Tiempo final (s)</label>
-          <input id="tf" type="text" inputmode="decimal" autocomplete="off" value="30">
+          <input id="tf" type="text" inputmode="text" autocomplete="off" value="30">
           <button class="go" id="calcBtn">Calcular y graficar</button>
         </div>
 
@@ -215,6 +215,17 @@
     </div>
 
     <div id="resultados">
+      <div class="panel" style="margin-bottom:18px">
+        <h2>Simulación en vivo <span>los puntos son la carga en movimiento · el capacitor se carga según q(t)</span></h2>
+        <canvas id="simCv" width="1200" height="460" style="width:100%;height:auto;border-radius:14px;background:rgba(10,3,30,.45)"></canvas>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+          <button class="chip" id="simPlay" onclick="simTogglePlay()">⏸ Pausar</button>
+          <button class="chip" onclick="simReset()">↺ Reiniciar</button>
+          <select id="simSpeed" style="width:auto"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select>
+          <input type="range" id="simSlider" min="0" max="1000" value="0" style="flex:1;min-width:160px" oninput="simSeek(this.value)">
+        </div>
+        <div class="hint">Los puntos van más rápido cuando i es grande y cambian de sentido cuando i es negativa. La placa de arriba es naranja cuando q &gt; 0 y verde cuando q &lt; 0. Puedes arrastrar la barra para ir a cualquier instante.</div>
+      </div>
 
       <!-- Indicadores circulares -->
       <div class="panel" style="margin-bottom:18px">
@@ -583,6 +594,7 @@ function calcular(){
     $("tabla").innerHTML = html;
 
     dibujar();
+    simReset();
   } catch(e){
     err.textContent = "⚠ " + e.message;
     err.style.display = "block";
@@ -621,6 +633,85 @@ document.querySelectorAll("[data-ex]").forEach(b => b.addEventListener("click", 
 
 actualizarCampos();
 calcular();
+/* ---------- Simulación animada ---------- */
+const sim = {t:0, play:true, last:0, dots:[], raf:0, mq:1, mi:1};
+function simReset(){
+  if (!ultimo) return;
+  const s = ultimo.sol;
+  sim.mq = Math.max(...s.Q.map(Math.abs)) || 1; sim.mi = Math.max(...s.I.map(Math.abs)) || 1;
+  sim.dots = Array.from({length:48}, (_, k) => k/48);
+  sim.t = 0; sim.play = true; sim.last = 0;
+  $("simPlay").textContent = "⏸ Pausar";
+  cancelAnimationFrame(sim.raf); sim.raf = requestAnimationFrame(simLoop);
+}
+function simTogglePlay(){
+  sim.play = !sim.play;
+  if (sim.play && sim.t >= ultimo.p.tf) sim.t = 0;
+  $("simPlay").textContent = sim.play ? "⏸ Pausar" : "▶ Reproducir";
+}
+function simSeek(v){ sim.t = v/1000*ultimo.p.tf; sim.play = false; $("simPlay").textContent = "▶ Reproducir"; }
+function simLoop(ts){
+  if (!ultimo) return;
+  const {p, sol} = ultimo, dt = sim.last ? Math.min((ts - sim.last)/1000, .1) : 0, sp = +$("simSpeed").value;
+  sim.last = ts;
+  if (sim.play){
+    sim.t = Math.min(p.tf, sim.t + dt*sp*p.tf/15);
+    if (sim.t >= p.tf){ sim.play = false; $("simPlay").textContent = "▶ Reproducir"; }
+  }
+  $("simSlider").value = sim.t/p.tf*1000;
+  const N = sol.T.length-1, f = sim.t/p.tf*N, j = Math.min(N-1, Math.floor(f)), u = f-j;
+  const q = sol.Q[j] + (sol.Q[j+1]-sol.Q[j])*u, i = sol.I[j] + (sol.I[j+1]-sol.I[j])*u, E = p.E(sim.t);
+  if (sim.play) sim.dots = sim.dots.map(s => (((s + i/sim.mi*0.2*sp*dt) % 1) + 1) % 1);
+  const c = $("simCv").getContext("2d"), x0 = 150, x1 = 1050, y0 = 90, y1 = 250, w = x1-x0, h = y1-y0, P = 2*(w+h);
+  c.clearRect(0, 0, 1200, 460); c.lineWidth = 3; c.font = "bold 22px system-ui";
+  // cable
+  c.strokeStyle = "#a99bd0"; c.beginPath(); c.moveTo(x1,155); c.lineTo(x1,y0); c.lineTo(x0,y0); c.lineTo(x0,y1); c.lineTo(x1,y1); c.lineTo(x1,185); c.stroke();
+  // resistor
+  c.clearRect(380, y0-4, 140, 8); c.strokeStyle = "#ff9a3d"; c.beginPath(); c.moveTo(380,y0);
+  for (let k = 1; k <= 6; k++) c.lineTo(380+k*20, y0 + (k%2 ? -14 : 14));
+  c.lineTo(520,y0); c.stroke();
+  // inductor
+  c.clearRect(700, y0-4, 180, 8); c.strokeStyle = "#d946ef";
+  for (let k = 0; k < 4; k++){ c.beginPath(); c.arc(722.5+k*45, y0, 22.5, Math.PI, 0); c.stroke(); }
+  // fuente
+  c.clearRect(x0-5, 140, 10, 60); c.strokeStyle = E >= 0 ? "#35e0c0" : "#ff9a3d"; c.fillStyle = "rgba(10,3,30,.9)";
+  c.beginPath(); c.arc(x0, 170, 28, 0, 7); c.fill(); c.stroke();
+  // capacitor: placas coloreadas por el signo de q
+  const a = .25 + .75*Math.min(1, Math.abs(q)/sim.mq), pos = `rgba(255,154,61,${a})`, neg = `rgba(53,224,192,${a})`;
+  c.fillStyle = q >= 0 ? pos : neg; c.fillRect(x1-45, 150, 90, 10);
+  c.fillStyle = q >= 0 ? neg : pos; c.fillRect(x1-45, 180, 90, 10);
+  c.fillStyle = "#f1ecff"; c.fillText("E", x0-8, 178); c.fillText("R", 440, y0-26); c.fillText("L", 782, y0-34); c.fillText("C", x1+62, 177);
+  c.fillText(q >= 0 ? "+" : "−", x1-75, 162); c.fillText(q >= 0 ? "−" : "+", x1-75, 197);
+  // cargas en movimiento
+  c.fillStyle = "#ffd27a";
+  sim.dots.forEach(s => {
+    let d = s*P, x, y;
+    if (d < w){ x = x0+d; y = y0; } else if ((d -= w) < h){ x = x1; y = y0+d; } else if ((d -= h) < w){ x = x1-d; y = y1; } else { d -= w; x = x0; y = y1-d; }
+    if (x === x1 && y > 150 && y < 190) return;
+    c.beginPath(); c.arc(x, y, 5, 0, 7); c.fill();
+  });
+  // lecturas
+  c.fillStyle = "#f1ecff"; c.fillText(`t = ${fmt(sim.t,4)} s`, 60, 34);
+  c.font = "18px system-ui"; c.fillStyle = "#a99bd0";
+  c.fillText(`q = ${fmt(q,3)} C   ·   i = ${fmt(i,3)} A   ·   E(t) = ${fmt(E,3)} V   ·   energía = ${fmt(0.5*p.L*i*i + q*q/(2*p.C),3)} J`, 60, 62);
+  // trazas q e i hasta el instante actual
+  const st = Math.max(1, Math.floor(N/500));
+  const tr = (arr, m, col, cur) => {
+    c.strokeStyle = col;
+    for (const pass of [0,1]){
+      c.globalAlpha = pass ? 1 : .25; c.lineWidth = pass ? 3 : 2; c.beginPath();
+      for (let n = 0; n <= (pass ? f : N); n += st){ const X = 60 + n/N*1080, Y = 370 - arr[n]/m*60; n ? c.lineTo(X,Y) : c.moveTo(X,Y); }
+      if (pass) c.lineTo(60 + f/N*1080, 370 - cur/m*60);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+  };
+  tr(sol.Q, sim.mq, "#ff9a3d", q); tr(sol.I, sim.mi, "#d946ef", i);
+  c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = 1; c.beginPath(); c.moveTo(60+f/N*1080, 300); c.lineTo(60+f/N*1080, 440); c.stroke();
+  c.fillStyle = "#a99bd0"; c.fillText("q(t) naranja · i(t) magenta (escaladas para compararlas)", 60, 296);
+  sim.raf = requestAnimationFrame(simLoop);
+}
+
 </script>
 </body>
 </html>
